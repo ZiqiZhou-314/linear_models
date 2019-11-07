@@ -121,3 +121,116 @@ fit = lm(price ~ stars + boro, data = nyc_airbnb) %>%
   broom::tidy()
 #p value here is saying whether the coef is significant.
 ```
+
+## dignostics.
+
+\#`{r} modelr::add_residuals(nyc_airbnb,fit) %>% ggplot(aes(x = boro, y
+= resid)) + geom_violin() + ylim(-500,500)`
+
+\#\`\`\`{r} modelr::add\_residuals(nyc\_airbnb,fit) %\>% ggplot(aes(x =
+stars, y = resid)) + geom\_point() + ylim(-500,500)
+
+modelr::add\_predictions(nyc\_airbnb,fit)
+\`\`\`
+
+## nesting
+
+``` r
+fit_interaction = lm(price ~ stars*boro + room_type*boro, data = nyc_airbnb) 
+
+broom:: tidy(fit_interaction)
+```
+
+    ## # A tibble: 16 x 5
+    ##    term                               estimate std.error statistic  p.value
+    ##    <chr>                                 <dbl>     <dbl>     <dbl>    <dbl>
+    ##  1 (Intercept)                           95.7      19.2     4.99   6.13e- 7
+    ##  2 stars                                 27.1       3.96    6.84   8.20e-12
+    ##  3 boroBrooklyn                         -26.1      25.1    -1.04   2.99e- 1
+    ##  4 boroQueens                            -4.12     40.7    -0.101  9.19e- 1
+    ##  5 boroBronx                             -5.63     77.8    -0.0723 9.42e- 1
+    ##  6 room_typePrivate room               -124.        3.00  -41.5    0.      
+    ##  7 room_typeShared room                -154.        8.69  -17.7    1.42e-69
+    ##  8 stars:boroBrooklyn                    -6.14      5.24   -1.17   2.41e- 1
+    ##  9 stars:boroQueens                     -17.5       8.54   -2.04   4.09e- 2
+    ## 10 stars:boroBronx                      -22.7      17.1    -1.33   1.85e- 1
+    ## 11 boroBrooklyn:room_typePrivate room    32.0       4.33    7.39   1.55e-13
+    ## 12 boroQueens:room_typePrivate room      54.9       7.46    7.37   1.81e-13
+    ## 13 boroBronx:room_typePrivate room       71.3      18.0     3.96   7.54e- 5
+    ## 14 boroBrooklyn:room_typeShared room     47.8      13.9     3.44   5.83e- 4
+    ## 15 boroQueens:room_typeShared room       58.7      17.9     3.28   1.05e- 3
+    ## 16 boroBronx:room_typeShared room        83.1      42.5     1.96   5.03e- 2
+
+``` r
+nyc_airbnb %>% 
+  filter(boro == "Brooklyn") %>% 
+  lm(price ~ stars + room_type, data = . ) %>% 
+  broom::tidy()
+```
+
+    ## # A tibble: 4 x 5
+    ##   term                  estimate std.error statistic   p.value
+    ##   <chr>                    <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)               69.6     14.0       4.96 7.27e-  7
+    ## 2 stars                     21.0      2.98      7.05 1.90e- 12
+    ## 3 room_typePrivate room    -92.2      2.72    -34.0  6.40e-242
+    ## 4 room_typeShared room    -106.       9.43    -11.2  4.15e- 29
+
+``` r
+nyc_airbnb %>% 
+  nest(data = -boro) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(-data) %>% 
+  unnest(results)
+```
+
+    ## # A tibble: 16 x 7
+    ##    boro     models term              estimate std.error statistic   p.value
+    ##    <fct>    <list> <chr>                <dbl>     <dbl>     <dbl>     <dbl>
+    ##  1 Bronx    <lm>   (Intercept)          90.1      15.2       5.94 5.73e-  9
+    ##  2 Bronx    <lm>   stars                 4.45      3.35      1.33 1.85e-  1
+    ##  3 Bronx    <lm>   room_typePrivate…   -52.9       3.57    -14.8  6.21e- 41
+    ##  4 Bronx    <lm>   room_typeShared …   -70.5       8.36     -8.44 4.16e- 16
+    ##  5 Queens   <lm>   (Intercept)          91.6      25.8       3.54 4.00e-  4
+    ##  6 Queens   <lm>   stars                 9.65      5.45      1.77 7.65e-  2
+    ##  7 Queens   <lm>   room_typePrivate…   -69.3       4.92    -14.1  1.48e- 43
+    ##  8 Queens   <lm>   room_typeShared …   -95.0      11.3      -8.43 5.52e- 17
+    ##  9 Brooklyn <lm>   (Intercept)          69.6      14.0       4.96 7.27e-  7
+    ## 10 Brooklyn <lm>   stars                21.0       2.98      7.05 1.90e- 12
+    ## 11 Brooklyn <lm>   room_typePrivate…   -92.2       2.72    -34.0  6.40e-242
+    ## 12 Brooklyn <lm>   room_typeShared …  -106.        9.43    -11.2  4.15e- 29
+    ## 13 Manhatt… <lm>   (Intercept)          95.7      22.2       4.31 1.62e-  5
+    ## 14 Manhatt… <lm>   stars                27.1       4.59      5.91 3.45e-  9
+    ## 15 Manhatt… <lm>   room_typePrivate…  -124.        3.46    -35.8  9.40e-270
+    ## 16 Manhatt… <lm>   room_typeShared …  -154.       10.1     -15.3  2.47e- 52
+
+Let’s nest neighborhood.
+
+``` r
+manhattan_nest_lm_results = 
+  nyc_airbnb %>% 
+  filter(boro == "Manhattan") %>% 
+  nest(data = -neighborhood) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(neighborhood, results) %>% 
+  unnest(results)
+```
+
+``` r
+manhattan_nest_lm_results %>% 
+  filter(str_detect(term, "room_type")) %>% 
+  ggplot(aes(x = neighborhood, y = estimate)) + 
+  geom_point() + 
+  facet_wrap(~term) + 
+  theme(axis.text.x = element_text(angle = 80, hjust = 1))
+```
+
+<img src="linear_models_files/figure-gfm/unnamed-chunk-10-1.png" width="90%" />
+
+\#`{r} nyc_airbnb %>% filter(neighborhood == "NoHo", room_type = )`

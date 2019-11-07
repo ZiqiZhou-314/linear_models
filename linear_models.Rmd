@@ -16,6 +16,7 @@ knitr::opts_chunk$set(
 library(tidyverse)
 library(p8105.datasets)
 
+
 options(
   ggplot2.continuous.colour = "viridis",
   ggplot2.continuous.fill = "viridis"
@@ -88,15 +89,82 @@ fit = lm(price ~ stars + boro, data = nyc_airbnb) %>%
 #p value here is saying whether the coef is significant.
 ```
 
+## dignostics.
+#```{r}
+modelr::add_residuals(nyc_airbnb,fit) %>% 
+  ggplot(aes(x = boro, y = resid)) + 
+  geom_violin() + 
+  ylim(-500,500)
+```
+
+#```{r}
+modelr::add_residuals(nyc_airbnb,fit) %>% 
+  ggplot(aes(x = stars, y = resid)) + 
+  geom_point() + 
+  ylim(-500,500)
+
+modelr::add_predictions(nyc_airbnb,fit)
+```
+
+
+## nesting
+
+```{r}
+fit_interaction = lm(price ~ stars*boro + room_type*boro, data = nyc_airbnb) 
+
+broom:: tidy(fit_interaction)
+```
+
+
+```{r}
+nyc_airbnb %>% 
+  filter(boro == "Brooklyn") %>% 
+  lm(price ~ stars + room_type, data = . ) %>% 
+  broom::tidy()
+```
+
+```{r}
+nyc_airbnb %>% 
+  nest(data = -boro) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(-data) %>% 
+  unnest(results)
+```
+
+
+Let's nest neighborhood.
+
+```{r}
+manhattan_nest_lm_results = 
+  nyc_airbnb %>% 
+  filter(boro == "Manhattan") %>% 
+  nest(data = -neighborhood) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(neighborhood, results) %>% 
+  unnest(results)
+```
 
 
 
+```{r}
+manhattan_nest_lm_results %>% 
+  filter(str_detect(term, "room_type")) %>% 
+  ggplot(aes(x = neighborhood, y = estimate)) + 
+  geom_point() + 
+  facet_wrap(~term) + 
+  theme(axis.text.x = element_text(angle = 80, hjust = 1))
+```
 
-
-
-
-
-
+#```{r}
+nyc_airbnb %>% 
+  filter(neighborhood == "NoHo", room_type = )
+```
 
 
 
