@@ -1,0 +1,120 @@
+---
+title: "linear_models"
+author: "Ziqi Zhou"
+date: "11/7/2019"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+library(tidyverse)
+library(p8105.datasets)
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+set.seed(1)
+```
+
+logstic regression for the binary variables.
+
+
+
+## Let's get started.
+
+We gonna use airbnb. 1st: Data cleaning.
+```{r}
+data("nyc_airbnb")
+
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate(stars = review_scores_location / 2) %>% 
+  rename(
+    boro = neighbourhood_group,
+    neighborhood = neighbourhood) %>% 
+  filter(boro != "Staten Island") %>% 
+  select(price, stars, boro, neighborhood, room_type)
+```
+
+Fit a first linear model!
+
+boro is the category.
+```{r}
+fit = lm(price ~ stars + boro, data = nyc_airbnb)
+
+summary(fit)
+coef(fit)
+summary(fit)$coef
+```
+
+tidy the results instead.
+```{r}
+fit %>% 
+  broom::tidy() %>% 
+  mutate(term = str_replace(term, "boro", "Boro:")) %>% 
+  knitr::kable(digits = 3)
+
+fit %>% 
+  broom::glance()
+```
+
+##Take a look at factors. (Factor predictors)
+
+#Does this have any meaning??
+```{r}
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate(
+    boro = fct_infreq(boro),  # put the boro in order according to their frequency.
+    room_type = fct_infreq(room_type)  
+  )
+```
+
+refit the last model
+```{r}
+fit = lm(price ~ stars + boro, data = nyc_airbnb) %>% 
+  broom::tidy()
+#p value here is saying whether the coef is significant.
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
