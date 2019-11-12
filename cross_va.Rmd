@@ -1,0 +1,90 @@
+---
+title: "Cross Validation"
+author: "Ziqi Zhou"
+date: "11/12/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+library(tidyverse)
+library(modelr)
+library(mgcv)
+
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+```
+
+generate a dataset
+
+```{r}
+nonlin_df = 
+  tibble(
+    id = 1:100,
+    x = runif(100, 0, 1),
+    y = 1 - 10 * (x - .3) ^ 2 + rnorm(100, 0, .3)
+  )
+
+nonlin_df %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point() + theme_bw()
+```
+
+Training and testing
+
+```{r}
+training_df = sample_n(nonlin_df,80)
+sample_frac(nonlin_df,0.8)  # also workd as the last code.
+test_df = anti_join(nonlin_df, training_df, by = "id")
+
+ggplot(training_df, aes(x = x, y = y)) + 
+  geom_point() + 
+  geom_point(data = test_df, color = "red")
+```
+##??why no red points??
+
+Fit three models of varying goodness.
+
+```{r}
+linear_mod = lm(y~x, data = training_df)
+smooth_mod = mgcv::gam(y ~ s(x), data = training_df)
+wiggly_mod = mgcv::gam(y ~ s(x, k = 30), sp = 10e-6, data = training_df)
+```
+
+
+```{r}
+training_df %>% 
+  add_predictions(smooth_mod) %>% 
+  ggplot(aes(x = x, y = y)) + geom_point() + 
+  geom_line(aes(y = pred), color = "red")
+```
+
+
+
+```{r}
+rmse(linear_mod, test_df)
+rmse(smooth_mod, test_df)
+rmse(wiggly_mod, test_df)
+```
+
+which one is better for  ???????
+
+
+always choose fit the test dataset better model.
+
+
+
+
