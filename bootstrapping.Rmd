@@ -1,0 +1,200 @@
+---
+title: "bootstrapping"
+author: "Ziqi Zhou"
+date: "11/14/2019"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+library(tidyverse)
+library(p8105.datasets)
+
+library(patchwork)
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+```
+
+```{r}
+set.seed(1)
+n_samp = 250
+
+sim_df_const = 
+  tibble(
+    x = rnorm(n_samp, 1, 1),
+    error = rnorm(n_samp, 0, 1),
+    y = 2 + 3 * x + error
+  )
+
+sim_df_nonconst = sim_df_const %>% 
+  mutate(
+  error = error * .75 * x,
+  y = 2 + 3 * x + error
+)
+```
+
+
+```{r}
+sim_df = 
+  bind_rows(const = sim_df_const, nonconst = sim_df_nonconst, .id = "data_source") 
+
+sim_df %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point(alpha = .5) +
+  stat_smooth(method = "lm") +
+  facet_grid(~data_source) 
+```
+
+Fit two models
+```{r}
+sim_df_const %>% 
+  lm(y ~x, data = . ) %>% 
+  broom::tidy()
+
+sim_df_nonconst %>% 
+  lm(y ~x, data = . ) %>% 
+  broom::tidy()
+```
+The R here the outcome is wrong. in the sim_df_nonconst std.error.
+se is not correct here. though other things might be true.
+Because of the assumption might be not true but we analysed use those assumption. 
+
+##Check in echo360.
+
+## how can I bootstrap
+
+Write a function to draw a bootstrap sample based on a dataframe.
+```{r}
+sim_df_nonconst %>% 
+  sample_frac(size = 1, replace = TRUE) %>%  #This is a wrapper around sample.int() to make it easy to 
+  arrange(x)
+
+```
+
+```{r}
+boot_sample = function(df){
+  sample_frac(df,size = 1, replace = TRUE)
+}
+```
+
+```{r}
+boot_sample(df = sim_df_nonconst) %>% 
+  ggplot(aes(x = x,y = y)) + 
+  geom_point()
+```
+
+organize the dataframe.]
+keeping track all the different boot_strap sample
+
+```{r}
+boot_straps = 
+  tibble(
+    strap_num = 1:1000,
+    strap_sample = rerun(1000, boot_sample(df = sim_df_nonconst))
+  ) 
+```
+do some kind of analysis
+what the slope looks like? slope distribution?
+
+```{r}
+bootstrap_results = 
+  boot_straps %>% 
+  mutate(
+    models = map(strap_sample, ~lm(y~x, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(-strap_sample,-models) %>% 
+  unnest(results)
+
+
+```
+summarize these results
+
+```{r}
+bootstrap_results %>% 
+  group_by(term) %>% 
+  summarize(se = sd(estimate))
+```
+
+
+##Try the modelr package.
+The difference is in the begining how the sample generated?...?
+```{r}
+boot_straps = 
+  sim_df_nonconst %>% 
+  modelr::bootstrap(1000) %>% 
+  mutate(
+    models = map(strap, ~lm(y~x, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(-strap,-models) %>% 
+  unnest(results) %>% 
+  group_by(term) %>% 
+  summarize(se = sd(estimate))
+
+```
+
+
+
+```{r}
+
+```
+
+## Revisit airbnb data.
+```{r}
+data("nyc_airbnb")
+
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate(stars = review_scores_location / 2) %>% 
+  rename(
+    boro = neighbourhood_group,
+    neighborhood = neighbourhood) %>% 
+  filter(boro != "Staten Island") %>% 
+  select(price, stars, boro, neighborhood, room_type)
+```
+
+
+```{r}
+nyc_airbnb %>% 
+  ggplot(aes(x = stars, y = price, color = room_type)) + 
+  geom_point() 
+```
+However this is not constant and so many outliners.
+
+What is the distrib of the slope.
+
+Re-use the stuff we just did
+```{r}
+nyc_airbnb %>% 
+  filter(boro == "Manhattan") %>% 
+  modelr::bootstrap(n = 1000) %>% 
+  mutate(
+    models = map(strap, ~lm(price ~ stars+ room_type, data = .x)),
+    results = map(models, broom::tidy)) %>% 
+  select(results) %>% 
+  unnest(results) %>% 
+  filter(term == "stars") %>% 
+  ggplot(aes(x = estimate)) + geom_density()
+  
+```
+
+It is skew.
+
+
+
+

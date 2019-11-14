@@ -86,5 +86,64 @@ which one is better for  ???????
 always choose fit the test dataset better model.
 
 
+# DO this all using modelr
+
+preforms the training / testing split multiple times, a stores the datasets using list columns.
+```{r}
+cv_df =  
+  crossv_mc(nonlin_df, 100)  # n(100)  is Number of test-training pairs to generate (an integer).
+# nest data 
+
+```
+one note about resample
+
+```{r}
+cv_df %>% pull(train) %>% .[[1]] %>% as.tibble()
+```
+
+```{r}
+cv_df =
+  cv_df %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+```
+try fitting the linear model to all of these...
+
+```{r}
+cv_df = 
+  cv_df %>% 
+  mutate(
+    linear_models = map(train, ~ lm(y ~ x, data = .x)),
+    smooth_models = map(train, ~ gam(y ~ s(x), data = .x)),
+    wiggly_models  = map(train, ~gam(y ~ s(x, k = 30), sp = 10e-6, data = .x)),
+    
+    rmse_lin = map2(.x = linear_models, .y = test, ~rmse(.x, .y)),
+    rmse_smo = map2(.x = smooth_models, .y = test, ~rmse(.x, .y)),
+    rmse_wig = map2(.x = wiggly_models, .y = test, ~rmse(.x, .y))
+  ) 
+```
+
+compare different models
+```{r}
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>%   # put them in order
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
+
+
+we goona choose smooth models
+
+
+```{r}
+
+```
+
 
 
